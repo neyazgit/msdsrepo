@@ -1,14 +1,34 @@
 ---
-title: "covid"
+title: "Covid 19 Data Analaysis"
 output:
-  pdf_document: default
   html_document: default
+  pdf_document: default
 date: "2023-06-25"
 ---
+###This report contains the data analysis and Visualization of following
+Analysis and Visualization of US totals
+Analysis and Visualization for State of Illinois cases vs deaths
+New case vs new deaths in the state of Alaska
+Lowest Deaths per cases
+Highest Deaths per cases
+Linear model relationship between cases per thousand to deaths per thousand
+
+###Question of Interest
+###How new cases related to deaths
+###Which states are more prone to deaths and what is their background?
+###What is the impact on Vaccination? Did deaths started to reduce after vaccination?
+###Is population directly related to cases and deaths?
+
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
+
+
+###SOURCE OF DATA
+
+##This data is sourced on the basis of study conducted by Johns Hopkins University.This includes separate dataset for Global and another for US.
+
 
 ```{r echo=FALSE, message=FALSE}
 library(tidyverse)
@@ -27,7 +47,6 @@ global_deaths <- read_csv(urls[2], show_col_types = FALSE)
 US_cases <- read_csv(urls[3], show_col_types = FALSE)
 US_deaths <- read_csv(urls[4], show_col_types = FALSE)
 ```
-
 
 ```{r echo=FALSE, message=FALSE}
 options(readr.show_col_types = FALSE)
@@ -90,28 +109,31 @@ global <- global %>%
 ```
 
 ###US_cases
+
 ```{r echo=FALSE}
 US_cases 
 ```
 
-
 ###US_deaths
+
 ```{r echo=FALSE}
 US_deaths
 ```
 
 ###US
+
 ```{r echo=FALSE}
 US
 ```
 
 ##Global
+
 ```{r echo=FALSE}
 global
 ```
 
-
 ###US_totals
+
 ```{r echo=FALSE, message=FALSE}
 US_totals  <- US_by_state <- US %>%
   group_by(Country_Region, date) %>%
@@ -139,7 +161,9 @@ US_totals %>%
   labs(title = "COVID19 in US", y=NULL)
 
 ```
+
 ###US totals new cases
+
 ```{r echo=FALSE, message=FALSE}
 US_totals <- US_totals %>% mutate(new_cases = cases - lag(cases),                                       new_deaths = deaths - lag(deaths))
 US_totals %>% 
@@ -156,7 +180,8 @@ US_totals %>%
 
 ```
 
-###US_by_state 
+###US_by_state
+
 ```{r echo=FALSE, message=FALSE}
 US_by_state <- US %>%
   group_by(Province_State, Country_Region, date) %>%
@@ -168,10 +193,10 @@ US_by_state <- US %>%
 US_by_state
 ```
 
-###Visualization of state
+###Visualization of Illinois
 
 ```{r echo=FALSE, message=FALSE}
-state <- "New York"
+state <- "Illinois"
 US_by_state %>%
   filter(cases > 0) %>%
   filter(Province_State == state) %>%
@@ -195,10 +220,8 @@ US_by_state
 
 ```
 
-
-
 ```{r echo=FALSE, message=FALSE}
-state <- "New York"
+state <- "Alaska"
 US_by_state %>% 
   filter(cases > 0) %>%
   filter(Province_State == state) %>%
@@ -215,6 +238,7 @@ US_by_state %>%
 ```
 
 ###Lowest deaths per cases
+
 ```{r echo=FALSE, message=FALSE}
 US_state_totals <- US_by_state %>%
   group_by(Province_State) %>%
@@ -228,6 +252,7 @@ US_state_totals %>%
 ```
 
 ###Highest deaths per cases
+
 ```{r echo=FALSE, message=FALSE}
 US_state_totals <- US_by_state %>%
   group_by(Province_State) %>%
@@ -240,7 +265,8 @@ US_state_totals %>%
   slice_max(deaths_per_thou, n = 10)
 ```
 
-###linear model
+###LINEAR MODEL -  cases per thousand to deaths per thousand
+
 ```{r echo=FALSE, message=FALSE}
 mod <- lm(deaths_per_thou ~ cases_per_thou, data = US_state_totals)
 summary(mod)
@@ -250,3 +276,14 @@ US_tot_w_pred %>% ggplot() +
     geom_point(aes(x = cases_per_thou, y = pred), color = "red")
 ```
 
+
+
+###CONCLUSION
+
+1.There was a rapid increase on cases between beginning of 2020 and beginning of 2021
+2.Analysis and Visualization of US New cases and deaths shows, new deaths started to significantly drop beginning 2022 inspite of new cases being reported. This i suspect is due to more people being vaccinated and chances of deaths after vaccination got significantly lower.
+3.Analysis and Visualization for State of Illinois cases vs deaths
+4.New case vs new deaths in the state of Alaska remain linearly proportional
+5.American samoa have lowest Deaths per cases.Other than islands, Hawaii remains as the state with lowest deaths per cases
+6.Arizona has the highest deaths per cases
+7.Linear model relationship between cases per thousand to deaths per thousand

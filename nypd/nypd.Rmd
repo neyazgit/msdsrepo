@@ -1,0 +1,188 @@
+---
+title: "NYPD SHOOTINGS DATA ANALYSIS"
+output:
+  html_document: default
+  pdf_document: default
+date: "2023-06-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###IMPORT DATASETS
+
+```{r get_nypd, message = FALSE}
+url_in <- "https://data.cityofnewyork.us/api/views/833y-fsy8/rows.csv?accessType=DOWNLOAD"
+url_pop <- "https://data.cityofnewyork.us/api/views/xywu-7bv9/rows.csv?accessType=DOWNLOAD"
+```
+
+###IMPORT LIBRARY
+
+```{r import_data, message = FALSE}
+library(readr)
+library(lubridate)
+library(dplyr)
+library(ggplot2)
+library(stringr)
+library(tidyverse)
+nypd_shooting_main <- read_csv(url_in, show_col_types = FALSE)
+nypd_shooting_main
+ny_population <- read_csv(url_pop, show_col_types = FALSE)
+ny_population
+```
+
+
+
+###CLEAN DATA
+```{r clean_data, message = FALSE}
+
+nypd_shooting <- nypd_shooting_main %>%
+  rename(DATE = OCCUR_DATE,
+         TIME = OCCUR_TIME)
+nypd_shooting <- nypd_shooting %>% 
+  mutate(across(-TIME, ~ifelse(is.na(.), "N/A", .)))
+nypd_shooting$DATE <- as.Date(nypd_shooting$DATE, format = "%m/%d/%Y")
+nypd_shooting <- subset(nypd_shooting, select = c("DATE","TIME", "BORO", "LOC_OF_OCCUR_DESC","LOC_CLASSFCTN_DESC","LOCATION_DESC","PERP_AGE_GROUP","PERP_SEX","PERP_RACE","VIC_AGE_GROUP","VIC_SEX","VIC_RACE")) 
+
+
+
+
+
+```
+```{r join_population,  message = FALSE}
+ny_population_2020 <- subset(ny_population, select = c("Borough","2020"))
+ny_population_2020$Borough = toupper(ny_population_2020$Borough)
+ny_population_2020 <- ny_population_2020 %>% 
+  rename(BORO = Borough, POPULATION = "2020")
+
+nypd_shooting <- nypd_shooting %>%
+  left_join(ny_population_2020, by = c("BORO"))
+
+nypd_shooting %>%
+select (DATE, TIME, BORO, POPULATION)
+```
+
+
+
+##ANALYZE DATA
+##Calculate shootings per thousand
+```{r shootings_by_boro,  message = FALSE}
+shootings_by_boro <- nypd_shooting %>% 
+  group_by(BORO) %>% 
+  summarise(Total = n()) %>% 
+  arrange(desc(Total))
+
+shootings_by_boro <- shootings_by_boro %>% left_join(ny_population_2020, by = c("BORO"))
+data_new <-  shootings_by_boro
+shootings_by_boro$SHOOTINGS_PER_THOUSAND <- data_new$Total * 1000/ data_new$POPULATION
+
+shootings_by_boro
+
+
+
+```
+
+
+
+##Visualization of shootings by BORO. Calcuate shootings per thousand population
+```{r vis_of_shootings,  message = FALSE}
+ggplot(shootings_by_boro, aes(x=BORO, y=Total, fill=BORO)) +
+  geom_bar(stat="identity") +
+  xlab("BORO") + ylab("Total shootings") +
+  ggtitle("NEW YORK SHOOTINGS") +
+  theme_minimal()
+
+ggplot(shootings_by_boro, aes(x=BORO, y=SHOOTINGS_PER_THOUSAND, fill=BORO)) +
+  geom_bar(stat="identity") +
+  xlab("BORO") + ylab("Shootings per thousand") +
+  ggtitle("NEW YORK SHOOTINGS PER THOUSAND") +
+  theme_minimal()
+
+
+```
+###BRONX boro has the highest shootings per thousand
+
+
+
+##Visualization of shootings by YEAR
+```{r shootings_by_year,  message = FALSE}
+shootings_by_year <- nypd_shooting %>%
+mutate(year = year(DATE)) %>%
+group_by(year, BORO) %>%
+  summarise(Total = n()) %>% 
+  arrange((year))
+
+pivot_data <- shootings_by_year %>% pivot_wider(names_from = BORO, values_from = Total)
+pivot_data
+
+shootings_by_year
+
+
+
+
+pivot_data %>% 
+
+  ggplot(aes(x = year, y = BRONX)) +
+  geom_line(aes(color = "BRONX")) +
+  geom_point(aes(color = "BRONX")) +
+  geom_line(aes(y = MANHATTAN, color = "MANHATTAN")) +
+  geom_point(aes(y = MANHATTAN, color = "MANHATTAN")) +
+  geom_line(aes(y = BROOKLYN, color = "BROOKLYN")) +
+  geom_point(aes(y = BROOKLYN, color = "BROOKLYN")) +
+    geom_line(aes(y = QUEENS, color = "QUEENS")) +
+  geom_point(aes(y = QUEENS, color = "QUEENS")) +
+    geom_line(aes(y = `STATEN ISLAND`, color = "STATEN ISLAND")) +
+  geom_point(aes(y = `STATEN ISLAND`, color = "STATEN ISLAND")) +
+  scale_y_log10() +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 90)) + 
+  labs(title = str_c("SHOOTINGS EACH YEAR"), y=NULL)
+```
+
+
+
+
+##LINEAR MODEL
+```{r model, message=FALSE}
+mod <- lm(POPULATION ~ Total, data = shootings_by_boro)
+summary(mod)
+shoot_pred <- shootings_by_boro %>% mutate(pred = predict(mod))
+ggplot(shoot_pred, aes(x = POPULATION, y = pred)) +
+  geom_point() +
+  geom_smooth(method = "lm") +
+  xlab("POPULATION OF BORO") +
+  ylab("TOTAL SHOOTINGS") +
+  ggtitle("TOTAL SHOOTINGS VS POPULATION")
+```  
+
+##BIAS IDENTIFICATION
+
+```{r bias, message=FALSE}
+shootings_by_loc <- nypd_shooting %>%
+ filter(LOC_CLASSFCTN_DESC != 'N/A') %>%
+group_by(LOC_CLASSFCTN_DESC) %>%
+  summarise(Total = n()) 
+shootings_by_loc 
+```
+
+```{r bias_plot, message=FALSE}
+ggplot(shootings_by_loc, aes(x=LOC_CLASSFCTN_DESC, y=Total, fill=LOC_CLASSFCTN_DESC)) +
+  geom_bar(stat="identity") +
+  xlab("LOCATION") + ylab("Total shootings") +
+  ggtitle("SHOOTING LOCATIONS") +
+  theme_minimal()
+```
+
+* Before conducting this data analysis, I had a personal bias that the most number of shootings occurs either on housing or commerical buildings either due to disagreement, fights, robbery/attack at home etc.
+
+* This data analysis is a real eye opener for me and it clearly shows that highest number of shootings take place on STREETS. This data helps in clearing out my personal bias. This is a real value add and data speaks above any bias.
+
+
+
+
+
+###session info
+```{r echo=FALSE}
+sessionInfo(package = NULL)
+```
